@@ -1,17 +1,17 @@
-const canvas = document.getElementById('mazeCanvas');
+\\const canvas = document.getElementById('mazeCanvas');
 const ctx = canvas.getContext('2d');
 
-// --- Tweak these for Difficulty ---
-const rows = 51; // MUST be odd. 51 is very large and complex.
-const cols = 51; // MUST be odd. 
-const displaySize = 800; // Total canvas display size in pixels
+// --- Difficulty & Configuration ---
+const rows = 51; // Complexity (must be odd)
+const cols = 51; 
+const displaySize = 800; 
 
-// Define Cell Types / State colors
-const WALL_COLOR = "#3C1053"; // Williams Purple for walls
-const START_COLOR = "#FFC72C"; // Williams Gold for start
-const EXIT_COLOR = "#2ecc71"; // Keep Green for clarity of goal
-const PATH_COLOR = "#FFC72C"; // Williams Gold for the solver path
-const OPEN_COLOR = "#FFFFFF"; // Pure White for open spaces
+// --- Williams Purple & Gold Theme ---
+const WALL_COLOR = "#3C1053";   // Williams Purple
+const START_COLOR = "#FFC72C";  // Williams Gold (Start)
+const EXIT_COLOR = "#2ecc71";   // Green (Goal)
+const PATH_COLOR = "#FFC72C";   // Williams Gold (Solver Path)
+const OPEN_COLOR = "#FFFFFF";   // White (Path)
 
 const cellSize = displaySize / rows;
 canvas.width = displaySize;
@@ -19,108 +19,126 @@ canvas.height = displaySize;
 
 let maze = [];
 let visited = [];
-let solving = false; // Prevent multiple solve calls
+let solving = false; 
 
+/**
+ * Initializes a new hard maze
+ */
 function initMaze() {
-    if (solving) return; // Don't allow generation mid-solve
+    if (solving) return;
     
+    // Fill with walls
     maze = Array.from({ length: rows }, () => Array(cols).fill(1));
     visited = Array.from({ length: rows }, () => Array(cols).fill(false));
     
-    // Start generating from (1,1)
+    // Generate maze structure
     generate(1, 1);
     
-    // Define Start and End in the extreme corners
-    maze[1][1] = 2; // Start
-    maze[rows - 2][cols - 2] = 3; // Exit
+    // Set fixed Start and Exit
+    maze[1][1] = 2; 
+    maze[rows - 2][cols - 2] = 3; 
     
     draw();
 }
 
-// Randomized DFS for Generation - Standard recursive approach
+/**
+ * Randomized DFS for Maze Generation (Carving)
+ */
 function generate(r, c) {
     maze[r][c] = 0;
-    
-    // Neighbors are 2 steps away (carving logic)
-    // Directions are shuffled to ensure randomness
     const dirs = [[0, 2], [0, -2], [2, 0], [-2, 0]].sort(() => Math.random() - 0.5);
 
     for (let [dr, dc] of dirs) {
         let nr = r + dr, nc = c + dc;
-        
-        // Safety checks for boundaries and unvisited wall cells
         if (nr > 0 && nr < rows - 1 && nc > 0 && nc < cols - 1 && maze[nr][nc] === 1) {
-            maze[r + dr / 2][c + dc / 2] = 0; // Carve path through wall between
+            maze[r + dr / 2][c + dc / 2] = 0; 
             generate(nr, nc);
         }
     }
 }
 
-// Render the grid to the canvas
+/**
+ * Renders the maze to the canvas
+ */
 function draw() {
     ctx.clearRect(0, 0, displaySize, displaySize);
     for (let r = 0; r < rows; r++) {
-        for (let col = 0; col < cols; col++) {
-            if (maze[r][col] === 1) ctx.fillStyle = WALL_COLOR; // Wall
-            else if (maze[r][col] === 2) ctx.fillStyle = START_COLOR; // Start
-            else if (maze[r][col] === 3) ctx.fillStyle = EXIT_COLOR; // Exit
-            else if (maze[r][col] === 4) ctx.fillStyle = PATH_COLOR; // Active Solver Path
-            else ctx.fillStyle = OPEN_COLOR; // Open space (0)
+        for (let c = 0; c < cols; c++) {
+            if (maze[r][col] === 1) ctx.fillStyle = WALL_COLOR;
+            else if (maze[r][col] === 2) ctx.fillStyle = START_COLOR;
+            else if (maze[r][col] === 3) ctx.fillStyle = EXIT_COLOR;
+            else if (maze[r][col] === 4) ctx.fillStyle = PATH_COLOR;
+            else ctx.fillStyle = OPEN_COLOR;
             
-            // Draw slightly smaller to create grid line effect (subtle)
-            ctx.fillRect(col * cellSize, r * cellSize, cellSize + 0.5, cellSize + 0.5);
+            ctx.fillRect(c * cellSize, r * cellSize, cellSize + 0.5, cellSize + 0.5);
         }
     }
 }
 
-// Recursive DFS Solver with Visualization (async/await)
+/**
+ * Recursive DFS Solver with Visualization
+ */
 async function solve(r, c) {
-    // 1. Safety Checks (Dead End / Bounds / Wall / Already Visited)
-    if (r < 0 || r >= rows || c < 0 || c >= cols || 
-        maze[r][c] === 1 || visited[r][c]) {
+    // Safety check: Bounds, Walls, or already Visited
+    if (r < 0 || r >= rows || c < 0 || c >= cols || maze[r][c] === 1 || visited[r][c]) {
         return false;
     }
     
-    // 2. Goal Check
-    if (maze[r][c] === 3) return true; // Exit found!
+    // Goal check
+    if (maze[r][c] === 3) return true; 
 
-    // 3. Mark current as Visited
     visited[r][c] = true;
     
-    // Mark Visually if it's not the start cell
-    if (maze[r][c] === 0) maze[r][c] = 4;
+    // Mark the path visually (if it's not the start square)
+    if (maze[r][c] === 0) {
+        maze[r][c] = 4;
+    }
     
     draw();
     
-    // Delay for animation (faster for larger maze)
-    await new Promise(res => setTimeout(res, 35)); 
+    // Animation delay (speed adjusted for large maze)
+    await new Promise(res => setTimeout(res, 25)); 
 
-    // 4. Explore Neighbors in a set order (this is DFS)
     const dirs = [[0, 1], [1, 0], [0, -1], [-1, 0]];
     for (let [dr, dc] of dirs) {
-        if (await solve(r + dr, c + dc)) return true; // Path propagated up!
+        if (await solve(r + dr, c + dc)) return true;
     }
 
-    // 5. Backtracking (if no neighbors worked)
-    // Remove from visual path, but leave as 'visited' so we don't return
-    if (maze[r][c] === 4) maze[r][c] = 0; 
+    // Backtrack visually: Remove gold path if dead end
+    if (maze[r][c] === 4) {
+        maze[r][c] = 0;
+    }
     draw();
     return false;
 }
 
-// Wrapper to prevent issues with start button
+/**
+ * Triggered by the "Solve" button
+ * Handles resetting states and clearing previous colors
+ */
 function startSolving() {
     if (solving) return;
     solving = true;
     
-    // Reset visited status for the solver, not the generator
+    // 1. Reset logic state (visited array)
     visited = Array.from({ length: rows }, () => Array(cols).fill(false));
     
-    // Start solving from (1,1)
+    // 2. Reset visual state (remove any previous gold paths)
+    for (let r = 0; r < rows; r++) {
+        for (let c = 0; c < cols; c++) {
+            if (maze[r][c] === 4) {
+                maze[r][c] = 0;
+            }
+        }
+    }
+    
+    draw(); // Draw clear maze before starting solve
+
+    // 3. Begin search from start coordinate
     solve(1, 1).then(() => {
-        solving = false; // Allow re-solving or generating new
+        solving = false;
     });
 }
 
-// Initial maze on load
+// Initial build
 initMaze();
